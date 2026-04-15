@@ -17,7 +17,7 @@ export function useVisitorLogger() {
         };
 
         // Шлем только на свой сервер
-        await fetch('http://34.150.1.210/log', {
+        await fetch('/api/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           mode: 'cors',
