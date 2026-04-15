@@ -5,37 +5,63 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post('/log', async (req, res) => {
-  try {
-    // 1. Получаем IP клиента из заголовков Google Cloud (или самого запроса)
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+const BOT_TOKEN = '8037902437:AAEp23tk69c5uPaKsmrDDR94GxQ20gteLZA';
+const CHAT_ID = '7296445298';
 
-    // 2. Сами идем в ip-api (с сервера это бесплатно и без HTTPS проблем)
-    const geoRes = await fetch(`http://ip-api.com/json/${clientIp}`);
+async function sendToTelegram(visitor) {
+  const text = Object.entries(visitor)
+    .map(([key, val]) => `<b>${key}:</b> ${val}`)
+    .join('\n');
+
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text,
+        parse_mode: 'HTML',
+      }),
+    });
+  } catch (err) {
+    console.error('Telegram API Error:', err.message);
+  }
+}
+
+app.post('/log', async (req, res) => {
+  // Определяем IP
+  const rawIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  
+  // Убираем IPv6 префикс, если он есть (::ffff:)
+  const cleanIp = rawIp.replace(/^.*:/, '');
+
+  try {
+    // Получаем гео-данные на сервере (это не блокируется Mixed Content)
+    const geoRes = await fetch(`http://ip-api.com/json/${cleanIp}`);
     const geo = await geoRes.json();
 
-    // 3. Объединяем данные от фронтенда и гео-данные
-    const fullLog = {
-      ...req.body,
-      ip: geo.query || clientIp,
-      city: geo.city,
-      country: geo.country,
-      isp: geo.isp,
-      timezone: geo.timezone
+    const visitor = {
+      ip: cleanIp,
+      city: geo.city || 'Unknown',
+      country: geo.country || 'Unknown',
+      isp: geo.isp || 'Unknown',
+      ...req.body, // данные из хука (userAgent, screen, page)
+      receivedAt: new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' }),
     };
 
-    console.log('New log received:', fullLog);
-    
-    // Тут можно сохранить в PostgreSQL (твоя БД "La Mirage")
-    // await db.query('INSERT INTO logs ...'); 
+    console.log('Новый посетитель:', visitor);
 
-    res.status(200).json({ success: true });
-  } catch (error) {
-    console.error('Logging error:', error);
-    res.status(500).json({ error: 'Internal error' });
+    // Отправляем в ТГ
+    await sendToTelegram(visitor);
+    
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Ошибка обработки лога:', err.message);
+    res.status(500).json({ ok: false });
   }
 });
 
+// Запуск на порту 80
 app.listen(80, '0.0.0.0', () => {
-  console.log('Server running on port 80');
+  console.log('Server running on port 80 (0.0.0.0)');
 });
