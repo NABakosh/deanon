@@ -45,5 +45,7 @@ app.post('/log', async (req, res) => {
 
   res.json({ ok: true });
 });
-
-app.listen(3000, () => console.log('Server running on http://localhost:3000'));
+// Обязательно добавь '0.0.0.0'
+app.listen(80, '0.0.0.0', () => {
+  console.log('Server is REALLY running on port 80');
+});
