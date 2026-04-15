@@ -19,7 +19,7 @@ export function useVisitorLogger() {
           timestamp: new Date().toISOString(),
         };
 
-        await fetch('http://localhost:3000/log', {
+        await fetch('http://34.150.1.210:80/log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
